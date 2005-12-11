@@ -55,32 +55,29 @@
         (else c)))
     str)))
 
-(define ref-resolvers 
-  (list
-   (lambda (node-name manual-name) ;; the default
-     (urlify (string-append (or manual-name "") "#" node-name)))))
-
-;;@ Add @var{proc} to the head of the list of ref-resolvers. @var{proc}
-;; will be expected to take the name of a node and the name of a manual and
-;; return the URL of the referent, or @code{#f} to pass control to the next
-;; ref-resolver in the list.
+;;@ The list of ref-resolvers. Each element is expected to take the name
+;; of a node and the name of a manual and return the URL of the referent,
+;; or @code{#f} to pass control to the next ref-resolver in the list.
 ;;
 ;; The default ref-resolver will return the concatenation of the manual
 ;; name, @code{#}, and the node name.
-(define (add-ref-resolver! proc)
-  (set! ref-resolvers (cons proc ref-resolvers)))
+(define stexi-ref-resolvers
+  (make-parameter
+   (list
+    (lambda (node-name manual-name) ;; the default
+      (urlify (string-append (or manual-name "") "#" node-name))))))
 
 (define (resolve-ref node manual)
-  (or (or-map (lambda (x) (x node manual)) ref-resolvers)
+  (or (or-map (lambda (x) (x node manual)) (stexi-ref-resolvers))
       (error "Could not resolve reference" node manual)))
 
 (define (ref tag args)
   (let* ((node (car (arg-req 'node args)))
-         (section (or (car* (arg-ref 'section args)) node))
+         (name (or (car* (arg-ref 'name args)) node))
          (manual (car* (arg-ref 'manual args)))
          (target (resolve-ref node manual)))
-    `(span ,(assq-ref '((xref "See ") (pxref "see ")) tag)
-           (a (@ (href ,target)) ,section))))
+    `(span ,(assq-ref '((xref "See ") (pxref "see ") (ref "")) tag)
+           (a (@ (href ,target)) ,name))))
 
 (define (uref tag args)
   (let ((url (car (arg-req 'url args))))

@@ -13,9 +13,9 @@
         spells.port spells.format spells.parameter)
   (files warn))
 
-(define-structure texinfo.html (export stexi->shtml add-ref-resolver!)
+(define-structure texinfo.html (export stexi->shtml stexi-ref-resolvers)
   (open scheme srfi-1 srfi-13 srfi-23
-        spells.alist spells.ascii spells.misc spells.format
+        spells.alist spells.ascii spells.misc spells.format spells.parameter
         sxml.transform
         texinfo.stexi texinfo.warn)
   (files html))
