@@ -1,6 +1,6 @@
 (define texinfo-warn-handler
   (make-parameter (lambda (msg)
-                    (format (current-error-port) "texinfo warning: ~s" msg))))
+                    (format (current-error-port) "texinfo warning: ~s~%" msg))))
 
 (define (texinfo-warn msg)
   ((texinfo-warn-handler) msg))

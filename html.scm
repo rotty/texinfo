@@ -79,7 +79,7 @@
          (section (or (car* (arg-ref 'section args)) node))
          (manual (car* (arg-ref 'manual args)))
          (target (resolve-ref node manual)))
-    `(span ,(assq-ref tag '((xref "See ") (pxref "see ")))
+    `(span ,(assq-ref '((xref "See ") (pxref "see ")) tag)
            (a (@ (href ,target)) ,section))))
 
 (define (uref tag args)
