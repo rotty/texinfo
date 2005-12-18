@@ -195,13 +195,16 @@
     (contents           EOL-ARGS . ())
     (insertcopying      EOL-ARGS . ())
 
+    ;; EOL white-space separated args
+    (deffnx             EOL-WS-ARGS . (category name . arguments))
+    (defunx             EOL-WS-ARGS . (name . arguments))
+    (defvarx            EOL-WS-ARGS . (name))
+    (defspecx           EOL-WS-ARGS . (name . arguments))
+    
+
     ;; EOL text commands
     (*ENVIRON-ARGS*     EOL-TEXT)
     (itemx              EOL-TEXT)
-    (deffnx             EOL-TEXT) ;; FIXME: x commands for all def*
-    (defunx             EOL-TEXT)
-    (defvarx            EOL-TEXT)
-    (defspecx           EOL-TEXT)
     (set                EOL-TEXT)
     (center             EOL-TEXT)
     (title              EOL-TEXT)
@@ -270,9 +273,9 @@
     (deftypevar         ENVIRON . (data-type name))
     (deffn              ENVIRON . (category name . arguments))
     (deftypefn          ENVIRON . (category data-type name . arguments))
-    (defspec            ENVIRON . (name arguments))
-    (defmac             ENVIRON . (name arguments))
-    (defun              ENVIRON . (name arguments))
+    (defspec            ENVIRON . (name . arguments))
+    (defmac             ENVIRON . (name . arguments))
+    (defun              ENVIRON . (name . arguments))
     (deftypefun         ENVIRON . (data-type name . arguments))
 
     (table              TABLE-ENVIRON . (formatter))
@@ -484,12 +487,13 @@
 ;; The procedure returns a list of arguments. Afterwards the current
 ;; character will be after the final #\}.
 
-(define (read-arguments port stop-char)
+(define (read-arguments port stop-char split-char)
   (define (split str)
     (read-char port) ;; eat the delimiter
     (let ((ret (map (lambda (x) (if (string-null? x) #f x))
                     (map string-trim-both
-                         (string-tokenize str (char-set-complement (char-set #\,)))))))
+                         (string-tokenize str (char-set-complement
+                                               (char-set split-char)))))))
       (if (and (pair? ret) (eq? (car ret) #f) (null? (cdr ret)))
           '()
           ret)))
@@ -574,8 +578,8 @@
        `((formatter (,(get-formatter))))))))
 
 (define (complete-start-command command port)
-  (define (get-arguments type arg-names stop-char)
-    (arguments->attlist port (read-arguments port stop-char) arg-names))
+  (define (get-arguments type arg-names stop-char split-char)
+    (arguments->attlist port (read-arguments port stop-char split-char) arg-names))
 
   (let* ((spec (command-spec command))
          (type (cadr spec))
@@ -586,9 +590,11 @@
        (values command '() type))
       ((INLINE-ARGS)
        (assert-curr-char '(#\{) "Inline element lacks {" port)
-       (values command (get-arguments type arg-names #\}) type))
+       (values command (get-arguments type arg-names #\} #\,) type))
       ((EOL-ARGS)
-       (values command (get-arguments type arg-names #\newline) type))
+       (values command (get-arguments type arg-names #\newline #\,) type))
+      ((EOL-WS-ARGS)
+       (values command (get-arguments type arg-names #\newline #\space) type))
       ((ENVIRON ENTRY INDEX)
        (skip-horizontal-whitespace port)
        (values command (parse-environment-args command port) type))
@@ -788,7 +794,9 @@
                 port))
 
           (cond
-           ((memq expected-content '(EMPTY-COMMAND INLINE-ARGS EOL-ARGS INDEX))
+           ((memq expected-content '(EMPTY-COMMAND
+                                     INLINE-ARGS EOL-ARGS EOL-WS-ARGS
+                                     INDEX))
             ;; empty or finished by complete-start-command
             (up seed))
            ((eq? command 'verbatim)
