@@ -370,7 +370,7 @@
 (define (read-command port)
   (let ((first-char (peek-char port)))
     (or (char-alphabetic? first-char)
-        (parser-error port "Nonalphabetic @-command char: '" first-char "'")))
+        (parser-error port "Nonalphabetic @-command char" first-char)))
   (string->symbol
     (next-token-of
       (lambda (c)
@@ -533,10 +533,10 @@
      ((null? in)
       (if (or (null? names) opt?)
           (reverse out)
-          (parser-error port "@-command expected more arguments:" 
+          (parser-error port "@-command expected more arguments" 
                         args arg-names names)))
      ((null? names)
-      (parser-error port "@-command didn't expect more arguments:" in))
+      (parser-error port "@-command didn't expect more arguments" in))
      ((not (car in))
       (or (and opt? (loop (cdr in) (cdr names) opt? out))
           (parser-error "@-command missing required argument"
