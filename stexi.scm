@@ -1,5 +1,5 @@
 ;; Texinfo SPE package
-;; Copyright (C) 2005 Andreas Rottmann <wingo at pobox dot com>
+;; Copyright (C) 2005-2006 Andreas Rottmann <a dot rottmann at gmx dot at>
 ;; Copyright (C) 2004 Andy Wingo <wingo at pobox dot com>
 ;; Copyright (C) 2001,2002 Oleg Kiselyov <oleg at pobox dot com>
 
@@ -869,7 +869,7 @@
                        (loop port expect-eof? end-para (not sig-ws?) seed))
                       ((INCLUDE)
                        ;; Recurse for include files
-                       (let ((seed (call-with-file-and-dir
+                       (let ((seed (call-with-input-file-and-directory
                                     (read-include-file-name port)
                                     (lambda (port)
                                       (loop port 'include end-para

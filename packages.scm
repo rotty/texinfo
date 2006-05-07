@@ -4,7 +4,7 @@
                                         texi->stexi
                                         stexi->sxml)
   (open scheme srfi-1 srfi-6 srfi-11 srfi-13 srfi-14 srfi-23
-        spells.condition spells.file spells.alist spells.misc spells.ascii
+        spells.condition spells.filesys spells.alist spells.misc spells.ascii
         sxml.simple sxml.transform sxml.ssax.input-parse sxml.ssax.util)
   (files stexi))
 
