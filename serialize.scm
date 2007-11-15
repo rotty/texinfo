@@ -78,8 +78,10 @@
               ","))
          "{" command "@" accum))
 
+(define nl (string #\newline))
+
 (define (eol-text exp lp command type formals args accum)
-  (list* "\n"
+  (list* nl
          (append-map (lambda (x) (lp x '()))
                      (reverse (if args (cddr exp) (cdr exp))))
          (list-intersperse
@@ -89,7 +91,7 @@
          " " command "@" accum))
 
 (define (eol-args exp lp command type formals args accum)
-  (list* "\n"
+  (list* nl
          (list-intersperse
           (apply append
                  (drop-while not
@@ -101,17 +103,17 @@
 (define (environ exp lp command type formals args accum)
   (case (car exp)
     ((texinfo)
-     (list* "@bye\n"
+     (list* "@bye" nl
             (append-map (lambda (x) (lp x '())) (reverse (cddr exp)))
-            "\n@c %**end of header\n\n"
+            nl "@c %**end of header" nl nl
             (assq-ref args 'title) "@settitle "
-            "\\input texinfo   @c -*-texinfo-*-\n@c %**start of header\n"
+            "\\input texinfo   @c -*-texinfo-*-" nl "@c %**start of header" nl
             accum))
     (else
-     (list* "\n\n" command "\n@end "
+     (list* nl nl command nl "@end "
             (append-map (lambda (x) (lp x '()))
                         (reverse (if args (cddr exp) (cdr exp))))
-            "\n"
+            nl
             (list-intersperse
              (append-map (lambda (x) (lp x '()))
                          (apply append
@@ -124,10 +126,10 @@
             " " command "@" accum))))
 
 (define (table-environ exp lp command type formals args accum)
-  (list* "\n\n" command "@end "
+  (list* nl nl command "@end "
          (append-map (lambda (x) (lp x '()))
                      (reverse (if args (cddr exp) (cdr exp))))
-         "\n"
+         nl
          (let* ((arg (if args (cadar args) ""))) ;; zero or one args
            (if (pair? arg)
                (list (symbol->string (car arg)) "@")
@@ -138,7 +140,7 @@
   (fill-string (string-concatenate strings) '((width . 72))))
 
 (define (paragraph exp lp command type formals args accum)
-  (list* "\n\n"
+  (list* nl nl
          (wrap
           (reverse
            (append-map (lambda (x) (lp x '())) (reverse (cdr exp)))))
@@ -146,12 +148,12 @@
 
 (define (item exp lp command type formals args accum)
   (list* (append-map (lambda (x) (lp x '())) (reverse (cdr exp)))
-         "@item\n"
+         "@item" nl
          accum))
 
 (define (entry exp lp command type formals args accum)
   (list* (append-map (lambda (x) (lp x '())) (reverse (cddr exp)))
-         "\n"
+         nl
          (append-map (lambda (x) (lp x '())) (reverse (cdar args)))
          "@item "
          accum))
