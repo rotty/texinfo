@@ -25,6 +25,12 @@
 ;;
 ;;; Code:
 
+(define nl (string #\newline))
+
+(define (and=> e receiver)
+  (cond (e => receiver)
+        (else #f)))
+
 (define (list-intersperse src-l elem)
   (if (null? src-l) src-l
       (let loop ((l (cdr src-l)) (dest (cons (car src-l) '())))
@@ -52,7 +58,7 @@
             (else (lp (cdr in) (cons (car in) out)))))))
 
 (define (include exp lp command type formals args accum)
-  (list* "\n"
+  (list* nl
          (list-intersperse
           args
           " ")
@@ -89,8 +95,6 @@
               ","))
          "{" command "@" accum))
 
-(define nl (string #\newline))
-
 (define (eol-text exp lp command type formals args accum)
   (list* nl
          (append-map (lambda (x) (lp x '()))
@@ -122,7 +126,7 @@
             (reverse (assq-ref args 'title)) "@settitle "
             (or (and=> (assq-ref args 'filename)
                        (lambda (filename)
-                         (cons "\n" (reverse (cons "@setfilename " filename)))))
+                         (cons nl (reverse (cons "@setfilename " filename)))))
                 "")
             "\\input texinfo   @c -*-texinfo-*-" nl "@c %**start of header" nl
             accum))
@@ -132,10 +136,10 @@
                                     (reverse (if args (cddr exp) (cdr exp))))))
               (if (or (null? body)
                       (eqv? (string-ref (car body)
-                                        (1- (string-length (car body))))
+                                        (- (string-length (car body)) 1))
                             #\newline))
                   body
-                  (cons "\n" body)))
+                  (cons nl body)))
             nl
             (apply
              append
@@ -162,7 +166,7 @@
          " " command "@" accum))
 
 (define (wrap strings)
-  (fill-string (string-concatenate strings) '((width . 72))))
+  (fill-string (string-concatenate strings) '((width 72))))
 
 (define (paragraph exp lp command type formals args accum)
   (list* nl nl
@@ -184,9 +188,9 @@
          accum))
 
 (define (fragment exp lp command type formals args accum)
-  (list* "\n@c %end of fragment\n"
+  (list* nl "@c %end of fragment" nl
          (append-map (lambda (x) (lp x '())) (reverse (cdr exp)))
-         "\n@c %start of fragment\n\n"
+         nl "@c %start of fragment" nl nl
          accum))
 
 (define serializers
