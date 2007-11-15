@@ -24,26 +24,6 @@
   (open scheme srfi-1 srfi-13 srfi-23
         spells.alist spells.format
         sxml.transform
-        texinfo.stexi texinfo.warn texinfo.string-wrap)
+        texinfo.stexi texinfo.warn lib42.wrap-string)
   (files serialize))
 
-;; This should be moved to spells, once the licencing is cleared
-(define-structure texinfo.string-wrap (export fill-string
-                                              string->wrapped-lines)
-  (open scheme srfi-1 srfi-13 srfi-14 srfi-23
-        spells.opt-args
-        texinfo.string-transform)
-  (files string-wrap))
-
-(define-structure texinfo.string-transform (export escape-special-chars
-                                                   transform-string
-                                                   expand-tabs
-                                                   center-string
-                                                   left-justify-string
-                                                   right-justify-string
-                                                   collapse-repeated-chars)
-  (open scheme srfi-6 srfi-13 srfi-23
-        spells.opt-args)
-  (files string-transform))
-
-;; arch-tag: 38070041-8210-48d6-9314-85a6d2c39d0a
