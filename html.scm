@@ -25,11 +25,11 @@
 ;;that the output of @code{stexi->shtml} is actually SXML with the HTML
 ;;vocabulary. This means that the output can be further processed, and
 ;;that it must eventually be serialized by
-;;@ref{sxml-simple-sxml->xml,sxml->xml,,,(sxml-simple)}.
+;;@ref{sxml simple sxml->xml,sxml->xml}.
 ;;        
 ;;References (i.e., the @code{@@ref} family of commands) are resolved by
 ;;a @dfn{ref-resolver}.
-;;@xref{sxml-texinfo-html-add-ref-resolver!,add-ref-resolver!} for more
+;;@xref{texinfo html add-ref-resolver!,add-ref-resolver!}, for more
 ;;information.
 ;;
 ;;; Code:
@@ -191,6 +191,7 @@
     (itemize      ul)
     (item         li) ;; itemx ?
     (para         p)
+    (*fragment*   div) ;; should be ok
 
     (asis         span)
     (bold         b)
@@ -215,7 +216,8 @@
 
 (define ignore-list
   '(page setfilename setchapternewpage iftex ifinfo ifplaintext ifxml sp vskip
-    menu ignore syncodeindex comment c))
+    menu ignore syncodeindex comment c dircategory direntry top shortcontents
+    cindex printindex))
 (define (ignored? tag)
   (memq tag ignore-list))
 

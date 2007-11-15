@@ -29,13 +29,24 @@
 ;;; Code:
 
 (define-module (texinfo reflection)
+  #:use-module ((srfi srfi-1)
+                #:select (append-map))
   #:use-module (oop goops)
   #:use-module (texinfo)
   #:use-module (texinfo plain-text)
   #:use-module (srfi srfi-13)
   #:use-module (scheme session)
   #:use-module (ice-9 documentation)
-  #:export (module-stexi-documentation object-stexi-documentation))
+  #:use-module (ice-9 optargs)
+  #:use-module ((sxml transform)
+                #:select (pre-post-order))
+  #:export (module-stexi-documentation
+            object-stexi-documentation
+            package-stexi-standard-copying
+            package-stexi-standard-titlepage
+            package-stexi-standard-menu
+            package-stexi-standard-prologue
+            package-stexi-documentation))
 
 ;; List for sorting the definitions in a module
 (define defs
@@ -164,23 +175,27 @@
                          (arguments ,@(get-proc-args object)))))
      ((is-a? object <generic>)
       (make-def 'defop `((name ,name)
+                         (class "object") ;; we need more info here
                          (category "Generic"))))
      (else
       (make-def 'defvar `((name ,name)))))))
 
+(define (module-name->node-name sym-name)
+  (string-join (map symbol->string sym-name) " "))
+
 (define (module-stexi-documentation sym-name)
   "Return documentation for the module named @var{sym-name}. The
 documentation will be formatted as @code{stexi}
- (@pxref{(texinfo),(texinfo)})."
+ (@pxref{texinfo,texinfo})."
   (let* ((commentary (and=> (module-commentary sym-name)
                             (lambda (x) (string-trim-both x #\newline))))
          (stexi (string->stexi commentary))
+         (node-name (module-name->node-name sym-name))
          (name-str (with-output-to-string
                      (lambda () (display sym-name))))
          (module (resolve-interface sym-name)))
     (define (anchor-name sym)
-      (string-join (map symbol->string (append sym-name (list sym)))
-                   "-"))
+      (string-append node-name " " (symbol->string sym)))
     (define (make-defs)
       (sort!
        (module-map
@@ -198,11 +213,7 @@ documentation will be formatted as @code{stexi}
        sort-defs))
 
     `(texinfo (% (title ,name-str))
-              (node (% (name
-                        ,(string-append
-                          "("
-                          (string-join (map symbol->string sym-name) " ")
-                          ")"))))
+              (node (% (name ,node-name)))
               (section "Overview")
               ,@(cdr stexi)
               (section "Usage")
@@ -220,5 +231,143 @@ documentation will be formatted as @code{stexi}
        (stexi->plain-text (module-stexi-documentation name))))
 
 (add-name-help-handler! module-help-handler)
+
+(define (package-stexi-standard-copying name version updated years
+                                        copyright-holder permissions)
+  "Create a standard texinfo @code{copying} section.
+
+@var{years} is a list of years (as integers) in which the modules
+being documented were released. All other arguments are strings."
+  `(copying
+    (para "This manual is for " ,name
+          " (version " ,version ", updated " ,updated ")")
+    (para "Copyright " ,(string-join (map number->string years) ",")
+          " " ,copyright-holder)
+    (quotation
+     (para ,permissions))))
+
+(define (package-stexi-standard-titlepage name version updated authors)
+  "Create a standard GNU title page.
+
+@var{authors} is a list of @code{(@var{name} . @var{email})}
+pairs. All other arguments are strings.
+
+Here is an example of the usage of this procedure:
+
+@smallexample
+(package-stexi-standard-titlepage
+ \"Foolib\"
+ \"3.2\"
+ \"26 September 2006\"
+ '((\"Alyssa P Hacker\" . \"alyssa@@example.com\"))
+ '(2004 2005 2006)
+ \"Free Software Foundation, Inc.\"
+ \"Standard GPL permissions blurb goes here\")
+@end smallexample
+"
+  `(;(setchapternewpage (% (all "odd"))) makes manuals too long
+    (titlepage
+     (title ,name)
+     (subtitle "version " ,version ", updated " ,updated)
+     ,@(map (lambda (pair)
+              `(author ,(car pair)
+                       " (" (email ,(cdr pair)) ")"))
+            authors)
+     (page)
+     (vskip (% (all "0pt plus 1filll")))
+     (insertcopying))))
+
+(define (package-stexi-standard-menu name modules module-descriptions
+                                     extra-entries)
+  "Create a standard top node and menu, suitable for processing
+by makeinfo."
+  (define (make-entry node description)
+    `("* " ,node "::"
+      ,(make-string (max (- 21 (string-length node)) 2) #\space)
+      ,@description "\n"))
+  `((ifnottex
+     (node (% (name "Top")))
+     (top (% (title ,name)))
+     (insertcopying)
+     (menu
+      ,@(apply
+         append
+         (map
+          (lambda (module description)
+            (make-entry (module-name->node-name module) description))
+          modules module-descriptions))
+      ,@(if extra-entries
+            (cons "\n" 
+                  (apply append (map make-entry
+                                     (map car extra-entries)
+                                     (map cdr extra-entries))))
+            '())))
+    (iftex
+     (shortcontents))))
+
+(define (package-stexi-standard-prologue name filename category
+                                         description copying titlepage
+                                         menu)
+  "Create a standard prologue, suitable for later serialization
+to texinfo and .info creation with makeinfo.
+
+Returns a list of stexinfo forms suitable for passing to
+@code{package-stexi-documentation} as the prologue. @xref{texinfo
+reflection package-stexi-documentation}, @ref{texinfo reflection
+package-stexi-standard-titlepage,package-stexi-standard-titlepage},
+@ref{texinfo reflection
+package-stexi-standard-copying,package-stexi-standard-copying},
+and @ref{texinfo reflection
+package-stexi-standard-menu,package-stexi-standard-menu}."
+  `(,copying
+    (dircategory (% (category ,category)))
+    (direntry
+     "* " ,name ": (" ,filename ").  " ,description ".")
+    ,@titlepage
+    ,@menu))
+
+(define (package-stexi-documentation-helper sym-name)
+  ;; returns a list of forms
+  (pre-post-order
+   (module-stexi-documentation sym-name)
+   ;; here taking advantage of the fact that we know what
+   ;; module-stexi-documentation outputs
+   `((texinfo . ,(lambda (tag attrs node . body)
+                   `(,node
+                     (chapter ,@(assq-ref (cdr attrs) 'title))
+                     ,@body)))
+     (*text* . ,(lambda (tag text) text))
+     (*default* . ,(lambda args args)))))
+
+(define (package-stexi-documentation modules name filename prologue
+                                     epilogue)
+  "Create stexi documentation for a @dfn{package}, where a
+package is a set of modules that is released together.
+
+@var{modules} is expected to be a list of module names, where a
+module name is a list of symbols. The stexi that is returned will
+be titled @var{name} and a texinfo filename of @var{filename}.
+
+@var{prologue} and @var{epilogue} are lists of stexi forms that
+will be spliced into the output document before and after the
+generated modules documentation, respectively.
+@xref{texinfo reflection package-stexi-standard-prologue}, to
+create a conventional GNU texinfo prologue."
+  (define (verify-modules-list l)
+    (define (all pred l)
+      (and (pred (car l))
+           (or (null? (cdr l)) (all pred (cdr l)))))
+    (false-if-exception
+     (all (lambda (x) (all symbol? x)) modules)))
+  (if (not (verify-modules-list modules))
+      (error "expected modules to be a list of a list of symbols"
+             modules))
+
+  `(texinfo
+    (% (title ,name)
+       (filename ,filename))
+    ,@prologue
+    ,@(append-map package-stexi-documentation-helper modules)
+    ,@epilogue))
 
 ;;; arch-tag: bbe2bc03-e16d-4a9e-87b9-55225dc9836c

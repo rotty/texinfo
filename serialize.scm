@@ -51,13 +51,24 @@
             ((null? (car in)) (lp (cdr in) out))
             (else (lp (cdr in) (cons (car in) out)))))))
 
+(define (include exp lp command type formals args accum)
+  (list* "\n"
+         (list-intersperse
+          args
+          " ")
+         " " command "@" accum))
+
 (define (empty-command exp lp command type formals args accum)
   (list* " " command "@" accum))
 
 (define (inline-text exp lp command type formals args accum)
-  (list* "}"
-         (append-map (lambda (x) (lp x '())) (reverse (cdr exp)))
-         "{" command "@" accum))
+  (if (not (string=? command "*braces*")) ;; fixme :(
+      (list* "}"
+             (append-map (lambda (x) (lp x '())) (reverse (cdr exp)))
+             "{" command "@" accum)
+      (list* "@}"
+             (append-map (lambda (x) (lp x '())) (reverse (cdr exp)))
+             "@{" accum)))
 
 (define (inline-args exp lp command type formals args accum)
   (list* "}"
@@ -84,10 +95,12 @@
   (list* nl
          (append-map (lambda (x) (lp x '()))
                      (reverse (if args (cddr exp) (cdr exp))))
-         (list-intersperse
-          (append-map (lambda (x) (lp (assq-ref args x) '()))
-                      (reverse formals))
-          " ")
+         (append-map
+          (lambda (x)
+            (append-map
+             (lambda (x) (lp x '()))
+             (reverse (assq-ref args x))))
+          (reverse formals))
          " " command "@" accum))
 
 (define (eol-args exp lp command type formals args accum)
@@ -97,7 +110,7 @@
                  (drop-while not
                              (map (lambda (x) (assq-ref args x))
                                   (reverse formals))))
-          " ")
+          ", ")
          " " command "@" accum))
 
 (define (environ exp lp command type formals args accum)
@@ -106,23 +119,35 @@
      (list* "@bye" nl
             (append-map (lambda (x) (lp x '())) (reverse (cddr exp)))
             nl "@c %**end of header" nl nl
-            (assq-ref args 'title) "@settitle "
+            (reverse (assq-ref args 'title)) "@settitle "
+            (or (and=> (assq-ref args 'filename)
+                       (lambda (filename)
+                         (cons "\n" (reverse (cons "@setfilename " filename)))))
+                "")
             "\\input texinfo   @c -*-texinfo-*-" nl "@c %**start of header" nl
             accum))
     (else
      (list* nl nl command nl "@end "
-            (append-map (lambda (x) (lp x '()))
-                        (reverse (if args (cddr exp) (cdr exp))))
+            (let ((body (append-map (lambda (x) (lp x '()))
+                                    (reverse (if args (cddr exp) (cdr exp))))))
+              (if (or (null? body)
+                      (eqv? (string-ref (car body)
+                                        (1- (string-length (car body))))
+                            #\newline))
+                  body
+                  (cons "\n" body)))
             nl
-            (list-intersperse
-             (append-map (lambda (x) (lp x '()))
-                         (apply append
-                                (map
-                                 reverse
-                                 (drop-while
-                                  not (map (lambda (x) (assq-ref args x))
-                                           (reverse formals))))))
-             " ")
+            (apply
+             append
+             (list-intersperse
+              (map (lambda (x) (lp x '()))
+                    (apply append
+                           (map
+                            reverse
+                            (drop-while
+                             not (map (lambda (x) (assq-ref args x))
+                                      (reverse formals))))))
+              '(" ")))
             " " command "@" accum))))
 
 (define (table-environ exp lp command type formals args accum)
@@ -158,6 +183,12 @@
          "@item "
          accum))
 
+(define (fragment exp lp command type formals args accum)
+  (list* "\n@c %end of fragment\n"
+         (append-map (lambda (x) (lp x '())) (reverse (cdr exp)))
+         "\n@c %start of fragment\n\n"
+         accum))
+
 (define serializers
   `((EMPTY-COMMAND . ,empty-command)
     (INLINE-TEXT . ,inline-text)
@@ -169,7 +200,9 @@
     (TABLE-ENVIRON . ,table-environ)
     (ENTRY . ,entry)
     (ITEM . ,item)
-    (PARAGRAPH . ,paragraph)))
+    (PARAGRAPH . ,paragraph)
+    (FRAGMENT . ,fragment)
+    (#f . ,include))) ; support writing include statements
 
 (define (serialize exp lp command type formals args accum)
   ((or (assq-ref serializers type)
@@ -191,7 +224,7 @@
   (string-concatenate-reverse
    (let lp ((in tree) (out '()))
      (cond
-      ((null? in) out)
+      ((or (not in) (null? in)) out)
       ((string? in) (cons (escape in) out))
       ((pair? in)
        (let ((command-spec (assq (car in) texi-command-specs)))
@@ -204,8 +237,15 @@
                         (symbol->string (car in))
                         (cadr command-spec)
                         (filter* symbol? (cddr command-spec))
-                        (and (pair? (cdr in)) (pair? (cadr in))
-                             (eq? (caadr in) '%) (cdadr in))
+                        (cond
+                         ((and (pair? (cdr in)) (pair? (cadr in))
+                               (eq? (caadr in) '%))
+                          (cdadr in))
+                         ((not (cadr command-spec))
+                          ;; include
+                          (cdr in))
+                         (else
+                          #f))
                         out))))
       (else
        (error "Invalid stexi" in))))))
