@@ -35,16 +35,20 @@
   #:use-module (texinfo)
   #:use-module (texinfo plain-text)
   #:use-module (srfi srfi-13)
+  #:use-module (scheme kwargs)
   #:use-module (scheme session)
   #:use-module (ice-9 documentation)
   #:use-module (ice-9 optargs)
   #:use-module ((sxml transform)
                 #:select (pre-post-order))
   #:export (module-stexi-documentation
+            script-stexi-documentation
             object-stexi-documentation
             package-stexi-standard-copying
             package-stexi-standard-titlepage
+            package-stexi-generic-menu
             package-stexi-standard-menu
+            package-stexi-extended-menu
             package-stexi-standard-prologue
             package-stexi-documentation))
 
@@ -54,15 +58,26 @@
     deftypemethod defopt defvr defvar deftypevr deftypevar deffn
     deftypefn defmac defspec defun deftypefun))
 
-(define (sort-defs . args)
-  (define (priority def)
-    (list-index defs (car def)))
-  (define (name def)
-    (cadr (assq 'name (cdadr def))))
-  (let ((priorities (map priority (map cadr args))))
-    (cond
-     ((not (apply eq? priorities)) (apply < priorities))
-     (else (apply string<=? (map name (map cadr args)))))))
+(define (sort-defs ordering a b)
+  (define (def x)
+    ;; a and b are lists of the form ((anchor ...) (def* ...)...)
+    (cadr x))
+  (define (name x)
+    (cadr (assq 'name (cdadr (def x)))))
+  (define (priority x)
+    (list-index defs (car (def x))))
+  (define (order x)
+    (or (list-index ordering (string->symbol (name x)))
+        ;; if the def is not in the list, a big number
+        1234567890))
+  (define (compare-in-order proc eq? < . args)
+    (if (not (eq? (proc a) (proc b)))
+        (< (proc a) (proc b))
+        (or (null? args)
+            (apply compare-in-order args))))
+  (compare-in-order order = <
+                    priority = <
+                    name string=? string<=?))
 
 (define (list*-join l infix restfix)
   (let lp ((in l) (out '()))
@@ -134,7 +149,7 @@
 (define initial-space? (make-regexp "^[[:space:]]"))
 (define (string->stexi str)
   (or (and (or (not str) (string-null? str))
-           '(*fragment* (para "[undocumented]")))
+           '(*fragment*))
       (and (or (string-index str #\@)
                (and (not (regexp-exec many-space? str))
                     (not (regexp-exec initial-space? str))))
@@ -142,21 +157,35 @@
             (texi-fragment->stexi str)))
       `(*fragment* (verbatim ,str))))
 
-(define (object-stexi-documentation object . name)
-  (if (pair? name)
-      (set! name (symbol->string (car name)))
-      (set! name "[unknown]"))
+(define (method-stexi-arguments method)
+  (define (arg-texinfo arg)
+    `(" (" (var ,(symbol->string (car arg))) " "
+      (code ,(symbol->string (cadr arg))) ")"))
+  (let lp ((bindings (cadr (method-source method))) (out '()))
+    (cond
+     ((null? bindings)
+      (reverse out))
+     ((not (pair? (car bindings)))
+      (append (reverse out) (arg-texinfo bindings) (list "...")))
+     (else
+      (lp (cdr bindings)
+          (append (reverse (arg-texinfo (car bindings))) out))))))
+
+(define/kwargs (object-stexi-documentation object (name "[unknown]")
+                                           (force #f))
+  (if (symbol? name)
+      (set! name (symbol->string name)))
   (let ((stexi ((lambda (x)
                   (cond ((string? x) (string->stexi x))
                         ((and (pair? x) (eq? (car x) '*fragment*)) x)
+                        (force `(*fragment*))
                         (else #f)))
-                (object-documentation object))))
+                (object-documentation
+                 (if (is-a? object <method>)
+                     (method-procedure object)
+                     object)))))
     (define (make-def type args)
       `(,type (% ,@args) ,@(cdr stexi)))
-    ;; An interesting dilemma here: How to document generic
-    ;; functions? Really we are just documenting methods on
-    ;; classes, not operations in general. Let's just document
-    ;; methods with classes. (TODO)
     (cond
      ((not stexi) #f)
      ;; stexi is now a list, headed by *fragment*.
@@ -173,17 +202,60 @@
      ((is-a? object <procedure>)
       (make-def 'defun `((name ,name)
                          (arguments ,@(get-proc-args object)))))
+     ((is-a? object <method>)
+      (make-def 'deffn `((category "Method")
+                         (name ,name)
+                         (arguments ,@(method-stexi-arguments object)))))
      ((is-a? object <generic>)
-      (make-def 'defop `((name ,name)
-                         (class "object") ;; we need more info here
-                         (category "Generic"))))
+      `(*fragment*
+        ,(make-def 'deffn `((name ,name)
+                            (category "Generic")))
+        ,@(map
+           (lambda (method)
+             (object-stexi-documentation method name #:force force))
+           (generic-function-methods object))))
      (else
       (make-def 'defvar `((name ,name)))))))
 
 (define (module-name->node-name sym-name)
   (string-join (map symbol->string sym-name) " "))
 
-(define (module-stexi-documentation sym-name)
+;; this copied from (ice-9 session); need to find a better way
+(define (module-filename name)
+  (let* ((name (map symbol->string name))
+         (reverse-name (reverse name))
+	 (leaf (car reverse-name))
+	 (dir-hint-module-name (reverse (cdr reverse-name)))
+	 (dir-hint (apply string-append
+                          (map (lambda (elt)
+                                 (string-append elt "/"))
+                               dir-hint-module-name))))
+    (%search-load-path (in-vicinity dir-hint leaf))))
+
+(define (read-module name)
+  (let ((filename (module-filename name)))
+    (if filename
+        (let ((port (open-input-file filename)))
+          (let lp ((out '()) (form (read port)))
+            (if (eof-object? form)
+                (reverse out)
+                (lp (cons form out) (read port)))))
+        '())))
+
+(define (module-export-list sym-name)
+  (define (module-form-export-list form)
+    (and (pair? form)
+         (eq? (car form) 'define-module)
+         (equal? (cadr form) sym-name)
+         (and=> (memq #:export (cddr form)) cadr)))
+  (let lp ((forms (read-module sym-name)))
+    (cond ((null? forms) '())
+          ((module-form-export-list (car forms)) => identity)
+          (else (lp (cdr forms))))))
+
+(define/kwargs (module-stexi-documentation sym-name
+                                           (docs-resolver
+                                            (lambda (name def) def)))
   "Return documentation for the module named @var{sym-name}. The
 documentation will be formatted as @code{stexi}
  (@pxref{texinfo,texinfo})."
@@ -193,7 +265,8 @@ documentation will be formatted as @code{stexi}
          (node-name (module-name->node-name sym-name))
          (name-str (with-output-to-string
                      (lambda () (display sym-name))))
-         (module (resolve-interface sym-name)))
+         (module (resolve-interface sym-name))
+         (export-list (module-export-list sym-name)))
     (define (anchor-name sym)
       (string-append node-name " " (symbol->string sym)))
     (define (make-defs)
@@ -201,16 +274,21 @@ documentation will be formatted as @code{stexi}
        (module-map
         (lambda (sym var)
           `((anchor (% (name ,(anchor-name sym))))
-            ,(if (variable-bound? var)
-                 (or (object-stexi-documentation (variable-ref var) sym)
+            ,@((lambda (x)
+                 (if (eq? (car x) '*fragment*)
+                     (cdr x)
+                     (list x)))
+               (if (variable-bound? var)
+                   (docs-resolver
+                    sym
+                    (object-stexi-documentation (variable-ref var) sym
+                                                #:force #t))
+                   (begin
+                     (warn "variable unbound!" sym)
                      `(defvar (% (name ,(symbol->string sym)))
-                        (para "[undocumented]")))
-                 (begin
-                   (warn "variable unbound!" sym)
-                   `(defvar (% (name ,(symbol->string sym)))
-                      "[unbound!]")))))
+                        "[unbound!]"))))))
         module)
-       sort-defs))
+       (lambda (a b) (sort-defs export-list a b))))
 
     `(texinfo (% (title ,name-str))
               (node (% (name ,node-name)))
@@ -219,9 +297,21 @@ documentation will be formatted as @code{stexi}
               (section "Usage")
               ,@(apply append! (make-defs)))))
 
+(define (script-stexi-documentation scriptpath)
+  "Return documentation for given script. The documentation will be
+taken from the script's commentary, and will be returned in the
+@code{stexi} format (@pxref{texinfo,texinfo})."
+  (let ((commentary (file-commentary scriptpath)))
+    `(texinfo (% (title ,(basename scriptpath)))
+              (node (% (name ,(basename scriptpath))))
+              ,@(if commentary
+                    (cdr
+                     (string->stexi
+                      (string-trim-both commentary #\newline)))
+                    '()))))
+
 (define (stexi-help-handler name value)
-  (and=> (object-stexi-documentation value name)
-         stexi->plain-text))
+  (stexi->plain-text (object-stexi-documentation value name #:force #t)))
 
 (add-value-help-handler! stexi-help-handler)
 
@@ -255,14 +345,14 @@ pairs. All other arguments are strings.
 Here is an example of the usage of this procedure:
 
 @smallexample
-(package-stexi-standard-titlepage
- \"Foolib\"
- \"3.2\"
- \"26 September 2006\"
- '((\"Alyssa P Hacker\" . \"alyssa@@example.com\"))
- '(2004 2005 2006)
- \"Free Software Foundation, Inc.\"
- \"Standard GPL permissions blurb goes here\")
+ (package-stexi-standard-titlepage
+  \"Foolib\"
+  \"3.2\"
+  \"26 September 2006\"
+  '((\"Alyssa P Hacker\" . \"alyssa@@example.com\"))
+  '(2004 2005 2006)
+  \"Free Software Foundation, Inc.\"
+  \"Standard GPL permissions blurb goes here\")
 @end smallexample
 "
   `(;(setchapternewpage (% (all "odd"))) makes manuals too long
@@ -277,10 +367,10 @@ Here is an example of the usage of this procedure:
      (vskip (% (all "0pt plus 1filll")))
      (insertcopying))))
 
-(define (package-stexi-standard-menu name modules module-descriptions
-                                     extra-entries)
-  "Create a standard top node and menu, suitable for processing
-by makeinfo."
+(define (package-stexi-generic-menu name entries)
+  "Create a menu from a generic alist of entries, the car of which
+should be the node name, and the cdr the description. As an exception,
+an entry of @code{#f} will produce a separator."
   (define (make-entry node description)
     `("* " ,node "::"
       ,(make-string (max (- 21 (string-length node)) 2) #\space)
@@ -293,17 +383,45 @@ by makeinfo."
       ,@(apply
          append
          (map
-          (lambda (module description)
-            (make-entry (module-name->node-name module) description))
-          modules module-descriptions))
-      ,@(if extra-entries
-            (cons "\n" 
-                  (apply append (map make-entry
-                                     (map car extra-entries)
-                                     (map cdr extra-entries))))
-            '())))
+          (lambda (entry)
+            (if entry
+                (make-entry (car entry) (cdr entry))
+                '("\n")))
+          entries))))
     (iftex
      (shortcontents))))
+
+
+(define (package-stexi-standard-menu name modules module-descriptions
+                                     extra-entries)
+  "Create a standard top node and menu, suitable for processing
+by makeinfo."
+  (package-stexi-generic-menu
+   name
+   (let ((module-entries (map cons
+                              (map module-name->node-name modules)
+                              module-descriptions))
+         (separate-sections (lambda (x) (if (null? x) x (cons #f x)))))
+     `(,@module-entries
+       ,@(separate-sections extra-entries)))))
+
+(define (package-stexi-extended-menu name module-pairs script-pairs
+                                     extra-entries)
+  "Create an \"extended\" menu, like the standard menu but with a
+section for scripts."
+  (package-stexi-generic-menu
+   name
+   (let ((module-entries (map cons
+                              (map module-name->node-name
+                                   (map car module-pairs))
+                              (map cdr module-pairs)))
+         (script-entries (map cons
+                              (map basename (map car script-pairs))
+                              (map cdr script-pairs)))
+         (separate-sections (lambda (x) (if (null? x) x (cons #f x)))))
+     `(,@module-entries
+       ,@(separate-sections script-entries)
+       ,@(separate-sections extra-entries)))))
 
 (define (package-stexi-standard-prologue name filename category
                                          description copying titlepage
@@ -326,12 +444,9 @@ package-stexi-standard-menu,package-stexi-standard-menu}."
     ,@titlepage
     ,@menu))
 
-(define (package-stexi-documentation-helper sym-name)
-  ;; returns a list of forms
+(define (stexi->chapter stexi)
   (pre-post-order
-   (module-stexi-documentation sym-name)
-   ;; here taking advantage of the fact that we know what
-   ;; module-stexi-documentation outputs
+   stexi
    `((texinfo . ,(lambda (tag attrs node . body)
                    `(,node
                      (chapter ,@(assq-ref (cdr attrs) 'title))
@@ -339,8 +454,11 @@ package-stexi-standard-menu,package-stexi-standard-menu}."
      (*text* . ,(lambda (tag text) text))
      (*default* . ,(lambda args args)))))
 
-(define (package-stexi-documentation modules name filename prologue
-                                     epilogue)
+(define/kwargs (package-stexi-documentation modules name filename
+                                            prologue epilogue
+                                            (module-stexi-documentation-args
+                                             '())
+                                            (scripts '()))
   "Create stexi documentation for a @dfn{package}, where a
 package is a set of modules that is released together.
 
@@ -352,7 +470,12 @@ be titled @var{name} and a texinfo filename of @var{filename}.
 will be spliced into the output document before and after the
 generated modules documentation, respectively.
 @xref{texinfo reflection package-stexi-standard-prologue}, to
-create a conventional GNU texinfo prologue."
+create a conventional GNU texinfo prologue.
+
+@var{module-stexi-documentation-args} is an optional argument that, if
+given, will be added to the argument list when
+@code{module-texi-documentation} is called. For example, it might be
+useful to define a @code{#:docs-resolver} argument."
   (define (verify-modules-list l)
     (define (all pred l)
       (and (pred (car l))
@@ -367,7 +490,15 @@ create a conventional GNU texinfo prologue."
     (% (title ,name)
        (filename ,filename))
     ,@prologue
-    ,@(append-map package-stexi-documentation-helper modules)
+    ,@(append-map (lambda (mod)
+                    (stexi->chapter
+                     (apply module-stexi-documentation
+                            mod module-stexi-documentation-args)))
+                  modules)
+    ,@(append-map (lambda (script)
+                    (stexi->chapter
+                     (script-stexi-documentation script)))
+                  scripts)
     ,@epilogue))
 
 ;;; arch-tag: bbe2bc03-e16d-4a9e-87b9-55225dc9836c
