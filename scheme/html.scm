@@ -1,5 +1,5 @@
 ;; SPE structure texinfo.html
-;; Copyright (C) 2005 Andreas Rottmann <rotty@debian.org>
+;; Copyright (C) 2005, 2008 Andreas Rottmann <rotty@debian.org>
 ;; Copyright (C) 2003,2004 Andy Wingo <wingo at pobox dot com>
 
 ;; This program is free software; you can redistribute it and/or    
@@ -55,29 +55,32 @@
         (else c)))
     str)))
 
-;;@ The list of ref-resolvers. Each element is expected to take the name
-;; of a node and the name of a manual and return the URL of the referent,
-;; or @code{#f} to pass control to the next ref-resolver in the list.
-;;
-;; The default ref-resolver will return the concatenation of the manual
-;; name, @code{#}, and the node name.
-(define stexi-ref-resolvers
-  (make-parameter
+(define ref-resolvers 
    (list
     (lambda (node-name manual-name) ;; the default
-      (urlify (string-append (or manual-name "") "#" node-name))))))
+     (urlify (string-append (or manual-name "") "#" node-name)))))
+
+(define (add-ref-resolver! proc)
+  "Add @var{proc} to the head of the list of ref-resolvers. @var{proc}
+will be expected to take the name of a node and the name of a manual and
+return the URL of the referent, or @code{#f} to pass control to the next
+ref-resolver in the list.
+
+The default ref-resolver will return the concatenation of the manual
+name, @code{#}, and the node name."
+  (set! ref-resolvers (cons proc ref-resolvers)))
 
 (define (resolve-ref node manual)
-  (or (or-map (lambda (x) (x node manual)) (stexi-ref-resolvers))
+  (or (or-map (lambda (x) (x node manual)) ref-resolvers)
       (error "Could not resolve reference" node manual)))
 
 (define (ref tag args)
   (let* ((node (car (arg-req 'node args)))
-         (name (or (car* (arg-ref 'name args)) node))
+         (section (or (car* (arg-ref 'section args)) node))
          (manual (car* (arg-ref 'manual args)))
          (target (resolve-ref node manual)))
-    `(span ,(assq-ref '((xref "See ") (pxref "see ") (ref "")) tag)
-           (a (@ (href ,target)) ,name))))
+    `(span ,(and=> (assq tag '((xref "See ") (pxref "see "))) cdr)
+           (a (@ (href ,target)) ,section))))
 
 (define (uref tag args)
   (let ((url (car (arg-req 'url args))))

@@ -95,20 +95,31 @@
               ","))
          "{" command "@" accum))
 
+(define (serialize-text-args lp formals args)
+  (apply
+   append
+   (list-intersperse
+    (map (lambda (arg) (append-map (lambda (x) (lp x '())) arg))
+         (map
+          reverse
+          (drop-while
+           not (map (lambda (x) (assq-ref args x))
+                    (reverse formals)))))
+    '(" "))))
+
+(define (eol-text-args exp lp command type formals args accum)
+  (list* "\n"
+         (serialize-text-args lp formals args)
+         " " command "@" accum))
+
 (define (eol-text exp lp command type formals args accum)
-  (list* nl
+  (list* "\n"
          (append-map (lambda (x) (lp x '()))
                      (reverse (if args (cddr exp) (cdr exp))))
-         (append-map
-          (lambda (x)
-            (append-map
-             (lambda (x) (lp x '()))
-             (reverse (assq-ref args x))))
-          (reverse formals))
          " " command "@" accum))
 
 (define (eol-args exp lp command type formals args accum)
-  (list* nl
+  (list* "\n"
          (list-intersperse
           (apply append
                  (drop-while not
@@ -120,38 +131,28 @@
 (define (environ exp lp command type formals args accum)
   (case (car exp)
     ((texinfo)
-     (list* "@bye" nl
+     (list* "@bye\n"
             (append-map (lambda (x) (lp x '())) (reverse (cddr exp)))
-            nl "@c %**end of header" nl nl
+            "\n@c %**end of header\n\n"
             (reverse (assq-ref args 'title)) "@settitle "
             (or (and=> (assq-ref args 'filename)
                        (lambda (filename)
-                         (cons nl (reverse (cons "@setfilename " filename)))))
+                         (cons "\n" (reverse (cons "@setfilename " filename)))))
                 "")
-            "\\input texinfo   @c -*-texinfo-*-" nl "@c %**start of header" nl
+            "\\input texinfo   @c -*-texinfo-*-\n@c %**start of header\n"
             accum))
     (else
-     (list* nl nl command nl "@end "
+     (list* "\n\n" command "@end "
             (let ((body (append-map (lambda (x) (lp x '()))
                                     (reverse (if args (cddr exp) (cdr exp))))))
               (if (or (null? body)
                       (eqv? (string-ref (car body)
-                                        (- (string-length (car body)) 1))
+                                        (1- (string-length (car body))))
                             #\newline))
                   body
-                  (cons nl body)))
-            nl
-            (apply
-             append
-             (list-intersperse
-              (map (lambda (x) (lp x '()))
-                    (apply append
-                           (map
-                            reverse
-                            (drop-while
-                             not (map (lambda (x) (assq-ref args x))
-                                      (reverse formals))))))
-              '(" ")))
+                  (cons "\n" body)))
+            "\n"
+            (serialize-text-args lp formals args)
             " " command "@" accum))))
 
 (define (table-environ exp lp command type formals args accum)

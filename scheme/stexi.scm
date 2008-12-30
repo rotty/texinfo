@@ -1,5 +1,5 @@
 ;; Texinfo SPE package
-;; Copyright (C) 2005-2006 Andreas Rottmann <a dot rottmann at gmx dot at>
+;; Copyright (C) 2005-2006, 2008 Andreas Rottmann <a dot rottmann at gmx dot at>
 ;; Copyright (C) 2004 Andy Wingo <wingo at pobox dot com>
 ;; Copyright (C) 2001,2002 Oleg Kiselyov <oleg at pobox dot com>
 
@@ -77,9 +77,9 @@
 ;; Some utilities
 
 (define (parser-error port message . rest)
-  (raise (condition (&parser-error (port port))
-                    (&message (message message))
-                    (&irritants (values rest)))))
+  (raise (condition (make-parser-error port)
+                    (make-message-condition message)
+                    (make-irritants-condition rest))))
 
 ;;========================================================================
 ;;            Reflection on the XML vocabulary
@@ -170,6 +170,12 @@
     (sc                 INLINE-TEXT)
     (titlefont          INLINE-TEXT)
     (asis               INLINE-TEXT)
+    (b                  INLINE-TEXT)
+    (i                  INLINE-TEXT)
+    (r                  INLINE-TEXT)
+    (sansserif          INLINE-TEXT)
+    (slanted            INLINE-TEXT)
+    (t                  INLINE-TEXT)
 
     ;; Inline args commands
     (value              INLINE-ARGS . (key))
@@ -182,6 +188,8 @@
     (result             INLINE-ARGS . ())
     (bullet             INLINE-ARGS . ())
     (copyright          INLINE-ARGS . ())
+    (tie                INLINE-ARGS . ())
+    (image              INLINE-ARGS . (file :opt width height alt-text extension))
 
     ;; EOL args elements
     (node               EOL-ARGS . (name :opt next previous up))
@@ -193,14 +201,12 @@
     (vskip              EOL-ARGS . all)
     (syncodeindex       EOL-ARGS . all)
     (contents           EOL-ARGS . ())
+    (shortcontents      EOL-ARGS . ())
+    (summarycontents    EOL-ARGS . ())
     (insertcopying      EOL-ARGS . ())
-
-    ;; EOL white-space separated args
-    (deffnx             EOL-WS-ARGS . (category name . arguments))
-    (defunx             EOL-WS-ARGS . (name . arguments))
-    (defvarx            EOL-WS-ARGS . (name))
-    (defspecx           EOL-WS-ARGS . (name . arguments))
-    
+    (dircategory        EOL-ARGS . (category))
+    (top		EOL-ARGS . (title))
+    (printindex		EOL-ARGS . (type))
 
     ;; EOL text commands
     (*ENVIRON-ARGS*     EOL-TEXT)
@@ -228,6 +234,26 @@
     (subheading         EOL-TEXT)
     (subsubheading      EOL-TEXT)
 
+    (deftpx             EOL-TEXT-ARGS . (category name . attributes))
+    (defcvx             EOL-TEXT-ARGS . (category class name))
+    (defivarx           EOL-TEXT-ARGS . (class name))
+    (deftypeivarx       EOL-TEXT-ARGS . (class data-type name))
+    (defopx             EOL-TEXT-ARGS . (category class name . arguments))
+    (deftypeopx         EOL-TEXT-ARGS . (category class data-type name . arguments))
+    (defmethodx         EOL-TEXT-ARGS . (class name . arguments))
+    (deftypemethodx     EOL-TEXT-ARGS . (class data-type name . arguments))
+    (defoptx            EOL-TEXT-ARGS . (name))
+    (defvrx             EOL-TEXT-ARGS . (category name))
+    (defvarx            EOL-TEXT-ARGS . (name))
+    (deftypevrx         EOL-TEXT-ARGS . (category data-type name))
+    (deftypevarx        EOL-TEXT-ARGS . (data-type name))
+    (deffnx             EOL-TEXT-ARGS . (category name . arguments))
+    (deftypefnx         EOL-TEXT-ARGS . (category data-type name . arguments))
+    (defspecx           EOL-TEXT-ARGS . (name . arguments))
+    (defmacx            EOL-TEXT-ARGS . (name . arguments))
+    (defunx             EOL-TEXT-ARGS . (name . arguments))
+    (deftypefunx        EOL-TEXT-ARGS . (data-type name . arguments))
+
     ;; Indexing commands
     (cindex             INDEX . entry)
     (findex             INDEX . entry)
@@ -244,8 +270,14 @@
     (ifhtml             ENVIRON . ())
     (ifxml              ENVIRON . ())
     (ifplaintext        ENVIRON . ())
+    (ifnotinfo          ENVIRON . ())
+    (ifnottex           ENVIRON . ())
+    (ifnothtml          ENVIRON . ())
+    (ifnotxml           ENVIRON . ())
+    (ifnotplaintext     ENVIRON . ())
     (titlepage          ENVIRON . ())
     (menu               ENVIRON . ())
+    (direntry           ENVIRON . ())
     (copying            ENVIRON . ())
     (example            ENVIRON . ())
     (smallexample       ENVIRON . ())
@@ -258,6 +290,7 @@
     (smalllisp          ENVIRON . ())
     (cartouche          ENVIRON . ())
     (quotation          ENVIRON . ())
+
     (deftp              ENVIRON . (category name . attributes))
     (defcv              ENVIRON . (category class name))
     (defivar            ENVIRON . (class name))
@@ -304,9 +337,7 @@
 ;; (texi-command-depth 'subsection 2)     @result{} #f
 ;; @end example
 (define (texi-command-depth command max-depth)
-
-  (let ((depth (cond ((assq command command-depths) => cdr)
-                     (else #f))))
+  (let ((depth (and=> (assq command command-depths) cdr)))
     (and depth (<= depth max-depth) depth)))
 
 ;; The % is for arguments
@@ -342,7 +373,7 @@
 (define cr (ascii->char 13))
 (define tab (ascii->char 9))
 (define nl (string #\newline))
-(define read-eof-breaks `(*eof* ,cr #\newline))
+(define read-eof-breaks `(*EOF* ,cr #\newline))
 (define (read-eof-line port)
   (if (eof-object? (peek-char port))
       (peek-char port)
@@ -352,8 +383,6 @@
         (if (and (eq? c cr) (eq? (peek-char port) #\newline))
             (read-char port))		; skip \n that follows \r
         line)))
-
-(define ascii->char integer->char)
 
 (define (skip-whitespace port)
   (skip-while `(#\space ,tab ,cr #\newline) port))
@@ -487,13 +516,11 @@
 ;; The procedure returns a list of arguments. Afterwards the current
 ;; character will be after the final #\}.
 
-(define (read-arguments port stop-char split-char)
+(define (read-arguments port stop-char)
   (define (split str)
     (read-char port) ;; eat the delimiter
     (let ((ret (map (lambda (x) (if (string-null? x) #f x))
-                    (map string-trim-both
-                         (string-tokenize str (char-set-complement
-                                               (char-set split-char)))))))
+                    (map string-trim-both (string-split str #\,)))))
       (if (and (pair? ret) (eq? (car ret) #f) (null? (cdr ret)))
           '()
           ret)))
@@ -518,7 +545,7 @@
 ;; INLINE-TEXT       One character after the #\{.
 ;; INLINE-ARGS       The first character after the #\}.
 ;; EOL-TEXT          The first non-whitespace character after the command.
-;; ENVIRON, TABLE-ENVIRON, EOL-ARGS
+;; ENVIRON, TABLE-ENVIRON, EOL-ARGS, EOL-TEXT
 ;;                   The first character on the next line.
 ;; PARAGRAPH, ITEM, EMPTY-COMMAND
 ;;                   The first character after the command.
@@ -578,8 +605,8 @@
        `((formatter (,(get-formatter))))))))
 
 (define (complete-start-command command port)
-  (define (get-arguments type arg-names stop-char split-char)
-    (arguments->attlist port (read-arguments port stop-char split-char) arg-names))
+  (define (get-arguments type arg-names stop-char)
+    (arguments->attlist port (read-arguments port stop-char) arg-names))
 
   (let* ((spec (command-spec command))
          (type (cadr spec))
@@ -590,11 +617,9 @@
        (values command '() type))
       ((INLINE-ARGS)
        (assert-curr-char '(#\{) "Inline element lacks {" port)
-       (values command (get-arguments type arg-names #\} #\,) type))
+       (values command (get-arguments type arg-names #\}) type))
       ((EOL-ARGS)
-       (values command (get-arguments type arg-names #\newline #\,) type))
-      ((EOL-WS-ARGS)
-       (values command (get-arguments type arg-names #\newline #\space) type))
+       (values command (get-arguments type arg-names #\newline) type))
       ((ENVIRON ENTRY INDEX)
        (skip-horizontal-whitespace port)
        (values command (parse-environment-args command port) type))
@@ -604,6 +629,9 @@
       ((EOL-TEXT)
        (skip-horizontal-whitespace port)
        (values command '() type))
+      ((EOL-TEXT-ARGS)
+       (skip-horizontal-whitespace port)
+       (values command (parse-eol-text-args command port) type))
       ((PARAGRAPH EMPTY-COMMAND ITEM FRAGMENT)
        (values command '() type))
       (else ;; INCLUDE shouldn't get here
@@ -616,14 +644,12 @@
 
 ;; Only reads @settitle, leaves it to the command parser to finish
 ;; reading the title.
-(define take-until-settitle
-  (let ((settitle (string-append nl "@settitle ")))
-    (lambda (port)
-      (or (find-string-from-port? settitle port)
+(define (take-until-settitle port)
+  (or (find-string-from-port? "\n@settitle " port)
           (parser-error port "No \\n@settitle  found"))
       (skip-horizontal-whitespace port)
       (and (eq? (peek-char port) #\newline)
-           (parser-error port "You have a @settitle, but no title")))))
+       (parser-error port "You have a @settitle, but no title")))
 
 ;; procedure+:	read-char-data PORT EXPECT-EOF? STR-HANDLER SEED
 ;;
@@ -657,7 +683,7 @@
 
 ;; read-char-data port expect-eof? preserve-ws? str-handler seed
 (define read-char-data
-  (let* ((end-chars-eof '(*eof* #\{ #\} #\@ #\newline)))
+  (let* ((end-chars-eof '(*EOF* #\{ #\} #\@ #\newline)))
     (define (handle str-handler str1 str2 seed)
       (if (and (string-null? str1) (string-null? str2))
           seed
@@ -757,6 +783,15 @@
         (error "no file listed")
         x))) ;; fixme: should expand @value{} references
 
+;;@ Turn some sxml string into a valid node name.
+(define (sxml->node-name sxml)
+  (let loop ((in (string->list (sxml->string sxml))) (out '()))
+    (if (null? in)
+        (apply string (reverse out))
+        (if (memq (car in) '(#\{ #\} #\@ #\,))
+            (loop (cdr in) out)
+            (loop (cdr in) (cons (car in) out))))))
+
 (define (index command arguments fdown fup parent-seed)
   (case command
     ((deftp defcv defivar deftypeivar defop deftypeop defmethod
@@ -768,8 +803,8 @@
             (fdown 'anchor args 'INLINE-ARGS '()))))
     ((cindex findex vindex kindex pindex tindex)
      (let ((args `((name ,(string-append (symbol->string command) "-"
-                                         (sxml->string
-                                          (cdr (assq 'entry arguments))))))))
+                                         (sxml->node-name
+                                          (assq 'entry arguments)))))))
        (fup 'anchor args parent-seed
             (fdown 'anchor args 'INLINE-ARGS '()))))
     (else parent-seed)))
@@ -790,13 +825,12 @@
           
           (define (port-for-content)
             (if (eq? expected-content 'EOL-TEXT)
-                (open-input-string (read-text-line port))
+                (open-string-input-port (read-text-line port))
                 port))
 
           (cond
-           ((memq expected-content '(EMPTY-COMMAND
-                                     INLINE-ARGS EOL-ARGS EOL-WS-ARGS
-                                     INDEX))
+           ((memq expected-content '(EMPTY-COMMAND INLINE-ARGS EOL-ARGS INDEX
+                                     EOL-TEXT-ARGS))
             ;; empty or finished by complete-start-command
             (up seed))
            ((eq? command 'verbatim)
@@ -987,6 +1021,11 @@
                         (acons (car arg-names) (cdar args) out)
                         (cons (list (car arg-names) (car args)) out))))))))))))
    
+(define (parse-eol-text-args command port)
+  ;; perhaps parse-environment-args should be named more
+  ;; generically.
+  (parse-environment-args command port))
+
 ;; procedure: texi-fragment->stexi STRING
 ;;
 ;; A DOM parser for a texinfo fragment STRING.
@@ -994,12 +1033,15 @@
 ;; The procedure returns an SXML tree headed by the special tag,
 ;; *fragment*.
 
-;;@ "Parse the texinfo commands in @var{string}, and return the resultant
-;; stexi tree. The head of the tree will be the special command,
+;;@ Parse the texinfo commands in @var{string-or-port}, and return the
+;; resultant stexi tree. The head of the tree will be the special command,
 ;; @code{*fragment*}."
-(define (texi-fragment->stexi string)
-  (let ((parser (make-dom-parser)))
-    (postprocess (car (parser '*fragment* (open-input-string string) '())))))
+(define (texi-fragment->stexi string-or-port)
+  (define (parse port)
+    (postprocess (car ((make-dom-parser) '*fragment* port '()))))
+  (if (input-port? string-or-port)
+      (parse string-or-port)
+      (parse (open-string-input-port string-or-port))))
 
 ;; procedure: texi->stexi PORT
 ;;
@@ -1088,7 +1130,8 @@
              (error "expected a constant to define for @set" in)))
         ((value)
          (loop (fold-right cons (cdr in)
-                           (or (cdr (assoc (cadr (assq 'key (cdadar in))) state))
+                           (or (and=>
+                                (assoc (cadr (assq 'key (cdadar in))) state) cdr)
                                (error "unknown value" (cdadar in) state)))
                out
                state #f sig-ws?))
