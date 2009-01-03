@@ -1,6 +1,6 @@
 ;;; warn.sls --- warning library for texinfo
 
-;; Copyright (C) 2008 Andreas Rottmann <a.rottmann@gmx.at>
+;; Copyright (C) 2008, 2009 Andreas Rottmann <a.rottmann@gmx.at>
 
 ;; Author: Andreas Rottmann <a.rottmann@gmx.at>
 
@@ -27,8 +27,10 @@
 (library (texinfo warn)
   (export texinfo-warn-handler texinfo-warn)
   (import (rnrs base)
+          (rnrs io simple)
           (spells format)
-          (spells parameter))
+          (spells parameter)
+          (spells include))
   
   (include-file ((texinfo scheme) warn))
 
