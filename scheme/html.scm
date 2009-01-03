@@ -1,5 +1,5 @@
 ;; SPE structure texinfo.html
-;; Copyright (C) 2005, 2008 Andreas Rottmann <rotty@debian.org>
+;; Copyright (C) 2005, 2008, 2009 Andreas Rottmann <rotty@debian.org>
 ;; Copyright (C) 2003,2004 Andy Wingo <wingo at pobox dot com>
 
 ;; This program is free software; you can redistribute it and/or    
@@ -55,23 +55,20 @@
         (else c)))
     str)))
 
-(define ref-resolvers 
+;;@ The list of ref-resolvers. Each element is expected to take the name
+;; of a node and the name of a manual and return the URL of the referent,
+;; or @code{#f} to pass control to the next ref-resolver in the list.
+;;
+;; The default ref-resolver will return the concatenation of the manual
+;; name, @code{#}, and the node name.
+(define stexi-ref-resolvers
+  (make-parameter
    (list
     (lambda (node-name manual-name) ;; the default
-     (urlify (string-append (or manual-name "") "#" node-name)))))
-
-(define (add-ref-resolver! proc)
-  "Add @var{proc} to the head of the list of ref-resolvers. @var{proc}
-will be expected to take the name of a node and the name of a manual and
-return the URL of the referent, or @code{#f} to pass control to the next
-ref-resolver in the list.
-
-The default ref-resolver will return the concatenation of the manual
-name, @code{#}, and the node name."
-  (set! ref-resolvers (cons proc ref-resolvers)))
+      (urlify (string-append (or manual-name "") "#" node-name))))))
 
 (define (resolve-ref node manual)
-  (or (or-map (lambda (x) (x node manual)) ref-resolvers)
+  (or (or-map (lambda (x) (x node manual)) (stexi-ref-resolvers))
       (error "Could not resolve reference" node manual)))
 
 (define (ref tag args)
@@ -80,16 +77,16 @@ name, @code{#}, and the node name."
          (manual (car* (arg-ref 'manual args)))
          (target (resolve-ref node manual)))
     `(span ,(and=> (assq tag '((xref "See ") (pxref "see "))) cdr)
-           (a (@ (href ,target)) ,section))))
+           (a (^ (href ,target)) ,section))))
 
 (define (uref tag args)
   (let ((url (car (arg-req 'url args))))
-    `(a (@ (href ,url)) ,(or (car* (arg-ref 'title args)) url))))
+    `(a (^ (href ,url)) ,(or (car* (arg-ref 'title args)) url))))
 
 ;; @!*&%( Mozilla gets confused at an empty ("<a .. />") a tag. Put an
 ;; empty string here to placate the reptile.
 (define (node tag args)
-  `(a (@ (name ,(urlify (car (arg-req 'name args))))) ""))
+  `(a (^ (name ,(urlify (car (arg-req 'name args))))) ""))
 
 (define (def-category tag args)
   (case tag
@@ -120,17 +117,17 @@ name, @code{#}, and the node name."
                      (code (arguments))
                      (var (list (code (arguments)))))))
   `(tr (td ,@(left-td-contents))
-       (td (div (@ (class "right")) "[" ,(def-category tag args) "]"))))
+       (td (div (^ (class "right")) "[" ,(def-category tag args) "]"))))
 
 (define (def tag args . body)
   `(div
     (table
-     (@ (cellpadding "0") (cellspacing "0") (width "100%") (class "def"))
+     (^ (cellpadding "0") (cellspacing "0") (width "100%") (class "def"))
      ,(def-tr tag args)
      ,@(filter-map (lambda (sub)
                      (and (procedure? sub) (sub)))
                    body))
-    (div (@ (class "description"))
+    (div (^ (class "description"))
          ,@(filter (lambda (sub)
                      (not (procedure? sub)))
                    body))))
@@ -144,7 +141,7 @@ name, @code{#}, and the node name."
     (let ((c (ascii-lowercase (char->ascii (string-ref start 0)))))
       (+ 1 (- c (char->ascii (if (ascii-upper? c) #\A #\a))))))
   `(ol ,@(if (and (pair? elts) (pair? (car elts)) (eq? (caar elts) '%))
-             (cons `(@ (start ,@(tonumber (arg-req 'start (car elts)))))
+             (cons `(^ (start ,@(tonumber (arg-req 'start (car elts)))))
                        ;; (type ,(type (arg-ref 'start (car elts)))))
                    (cdr elts))
              elts)))
@@ -163,16 +160,16 @@ name, @code{#}, and the node name."
     (dd ,@body)))
 
 (define tag-replacements
-  '((titlepage    div (@ (class "titlepage")))
-    (title        h2  (@ (class "title")))
-    (subtitle     h3  (@ (class "subtitle")))
-    (author       h3  (@ (class "author")))
+  '((titlepage    div (^ (class "titlepage")))
+    (title        h2  (^ (class "title")))
+    (subtitle     h3  (^ (class "subtitle")))
+    (author       h3  (^ (class "author")))
     (example      pre)
     (lisp         pre)
-    (smallexample pre (@ (class "smaller")))
-    (smalllisp    pre (@ (class "smaller")))
-    (cartouche    div (@ (class "cartouche")))
-    (verbatim     pre (@ (class "verbatim")))
+    (smallexample pre (^ (class "smaller")))
+    (smalllisp    pre (^ (class "smaller")))
+    (cartouche    div (^ (class "cartouche")))
+    (verbatim     pre (^ (class "verbatim")))
     (chapter      h2)
     (section      h3)
     (subsection   h4)
@@ -202,20 +199,20 @@ name, @code{#}, and the node name."
     (samp         samp)
     (code         code)
     (kbd          kbd)
-    (key          code (@ (class "key")))
+    (key          code (^ (class "key")))
     (var          var)
-    (env          code (@ (class "env")))
-    (file         code (@ (class "file")))
-    (command      code (@ (class "command")))
-    (option       code (@ (class "option")))
-    (url          code (@ (class "url")))
+    (env          code (^ (class "env")))
+    (file         code (^ (class "file")))
+    (command      code (^ (class "command")))
+    (option       code (^ (class "option")))
+    (url          code (^ (class "url")))
     (dfn          dfn)
     (cite         cite)
     (acro         acronym)
-    (email        code (@ (class "email")))
+    (email        code (^ (class "email")))
     (emph         em)
     (strong       strong)
-    (sc           span (@ (class "small-caps")))))
+    (sc           span (^ (class "small-caps")))))
 
 (define ignore-list
   '(page setfilename setchapternewpage iftex ifinfo ifplaintext ifxml sp vskip
@@ -225,16 +222,16 @@ name, @code{#}, and the node name."
   (memq tag ignore-list))
 
 (define rules
-  `((% *preorder* . ,(lambda args args)) ;; Keep these around...
+  `((% *PREORDER* . ,(lambda args args)) ;; Keep these around...
     (texinfo   . ,(lambda (tag args . body)
                     (pre-post-order
                      `(html
-                       (@ (xmlns "http://www.w3.org/1999/xhtml"))
+                       (^ (xmlns "http://www.w3.org/1999/xhtml"))
                        (head (title ,(car (arg-req 'title args))))
                        (body ,@body))
-                     `((% *preorder* . ,(lambda args #f)) ;; ... filter out.
-                       (*text*       . ,(lambda (tag x) x))
-                       (*default*    . ,(lambda (tag . body)
+                     `((% *PREORDER* . ,(lambda args #f)) ;; ... filter out.
+                       (*TEXT*       . ,(lambda (tag x) x))
+                       (*DEFAULT*    . ,(lambda (tag . body)
                                           (cons tag body)))))))
     (copyright . ,(lambda args '(*ENTITY* "copy")))
     (result    . ,(lambda args '(*ENTITY* "rArr")))
@@ -252,8 +249,8 @@ name, @code{#}, and the node name."
     (deftypefn . ,def) (defmac . ,def) (defspec . ,def) (defun . ,def)
     (deftypefun . ,def)
     (defunx . ,defx) (deffnx . ,defx) (defvarx . ,defx) (defspecx . ,defx)
-    (*text*    . ,(lambda (tag x) x))
-    (*default* . ,(lambda (tag . body)
+    (*TEXT*    . ,(lambda (tag x) x))
+    (*DEFAULT* . ,(lambda (tag . body)
                     (let ((subst (assq tag tag-replacements)))
                       (cond
                        (subst (append (cdr subst) body))

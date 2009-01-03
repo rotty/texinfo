@@ -1170,7 +1170,7 @@
    tree
    `((% . ,(lambda (x . t) (cons 'texinfo-arguments t)))
      (*text* . ,(lambda (x t) t))
-     (*default* . ,(lambda (x . t) (cons x t))))))
+     (*DEFAULT* . ,(lambda (x . t) (cons x t))))))
 
 ;;; arch-tag: 73890afa-597c-4264-ae70-46fe7756ffb5
 ;;; texinfo.scm ends here
