@@ -1,6 +1,6 @@
 ;;; internals.sls --- library providing the texinfo internals
 
-;; Copyright (C) 2008 Andreas Rottmann <a.rottmann@gmx.at>
+;; Copyright (C) 2008, 2009 Andreas Rottmann <a.rottmann@gmx.at>
 
 ;; Author: Andreas Rottmann <a.rottmann@gmx.at>
 
@@ -72,12 +72,6 @@
 
   (define (string-split s c)
     (x:string-split s (string c) #t))
-  
-  (define-syntax and=>
-    (syntax-rules ()
-      ((and=> expr receiver)
-       (cond (expr => receiver)
-             (else #f)))))
   
   (include-file ((texinfo scheme) stexi))
 
