@@ -136,6 +136,14 @@
   (lambda ()
     (def-tr tag args)))
 
+(define (bullet->attrs bullet)
+  (if (and (pair? bullet)
+           (null? (cdr bullet)))
+      (case (car bullet)
+        ((bullet) '((type "disk")))
+        ((minus)  '((type "square"))) ;; well, at least it's different
+        (else     '()))))
+
 (define (enumerate tag . elts)
   (define (tonumber start)
     (let ((c (ascii-lowercase (char->ascii (string-ref start 0)))))
@@ -143,6 +151,11 @@
   `(ol ,@(if (and (pair? elts) (pair? (car elts)) (eq? (caar elts) '%))
              (cons `(^ (start ,@(tonumber (arg-req 'start (car elts)))))
                        ;; (type ,(type (arg-ref 'start (car elts)))))
+                   elts))))
+
+(define (itemize tag . elts)
+  `(ul ,@(if (and (pair? elts) (pair? (car elts)) (eq? (caar elts) '%))
+             (cons `(^ ,@(bullet->attrs (arg-ref 'bullet (car elts))))
                    (cdr elts))
              elts)))
 
@@ -239,6 +252,7 @@
     (uref . ,uref)
     (node . ,node) (anchor . ,node)
     (table . ,table)
+    (itemize . ,itemize)
     (enumerate . ,enumerate)
     (entry . ,entry)
 
