@@ -150,7 +150,7 @@
 
 (define (itemize tag . elts)
   `(ul ,@(if (and (pair? elts) (pair? (car elts)) (eq? (caar elts) '%))
-             (cons `(^ ,@(bullet->attrs (arg-ref 'bullet (car elts))))
+             (cons `(^ ,@(bullet->attrs (assq-ref (cdar elts) 'bullet)))
                    (cdr elts))
              elts)))
 
