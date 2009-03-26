@@ -272,6 +272,7 @@
     (smallexample ,example)
     (smalllisp    ,example)
     (verbatim     ,verbatim)
+    (*fragment*   ,fragment)
 
     (deftp        ,def)
     (defcv        ,def)

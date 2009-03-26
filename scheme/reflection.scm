@@ -32,7 +32,7 @@
   #:use-module (texinfo plain-text)
   #:use-module (srfi srfi-13)
   #:use-module (scheme kwargs)
-  #:use-module (scheme session)
+  #:use-module (ice-9 session)
   #:use-module (ice-9 documentation)
   #:use-module (ice-9 optargs)
   #:use-module ((sxml transform)
