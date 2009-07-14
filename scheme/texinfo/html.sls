@@ -2,8 +2,9 @@
 
 (library (texinfo html)
   (export stexi->shtml stexi-ref-resolvers)
-  (import (except (rnrs base) error string-copy string->list string-for-each)
-          (rnrs lists)
+  (import (except (rnrs base)
+                  error string-copy string->list string-for-each
+                  map for-each)
           (rnrs io simple)
           (spells misc)
           (srfi :1 lists)
@@ -13,13 +14,13 @@
           (spells ascii)
           (spells misc)
           (spells format)
-          (spells parameter)
+          (srfi :39 parameters)
           (only (spells error) make-error-signaller)
           (spells include)
-          (sxml transform)
+          (xitomatl ssax tree-trans)
           (texinfo)
           (texinfo warn))
 
   (define error (make-error-signaller "texinfo html"))
   
-  (include-file ((texinfo scheme) html)))
+  (include-file ((texinfo private) html)))

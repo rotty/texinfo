@@ -29,9 +29,9 @@
   (import (rnrs base)
           (rnrs io simple)
           (spells format)
-          (spells parameter)
+          (srfi :39 parameters)
           (spells include))
   
-  (include-file ((texinfo scheme) warn))
+  (include-file ((texinfo private) warn))
 
   )

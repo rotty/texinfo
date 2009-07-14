@@ -40,17 +40,18 @@
    complete-start-command
    read-char-data
    )
-  (import (except (rnrs base) error string-copy string-for-each string->list)
+  (import (except (rnrs base)
+                  error string-copy string-for-each string->list
+                  map for-each)
           (rnrs conditions)
           (rnrs exceptions)
           (rnrs io ports)
           (rnrs io simple)
-          (rnrs lists)
           (except (rnrs unicode) string-titlecase string-upcase string-downcase)
           (srfi :1 lists)
           (srfi :13 strings)
           (srfi :14 char-sets)
-          (prefix (xitomatl strings) x:)
+          (spells string-utils)
           (only (spells error) make-error-signaller)
           (spells filesys)
           (spells alist)
@@ -58,20 +59,15 @@
           (spells condition)
           (spells include)
           (spells tracing)
-          (sxml simple)
-          (sxml transform)
-          (sxml ssax input-parse)
-          (sxml ssax util)
-          )
+          (xitomatl ssax extras)
+          (xitomatl ssax tree-trans)
+          (xitomatl ssax private-5-1 input-parse)
+          (xitomatl ssax private-5-1 look-for-str))
 
   (define ascii->char integer->char)
   (define open-input-string open-string-input-port)
-
   (define error (make-error-signaller "texinfo library"))
 
-  (define (string-split s c)
-    (x:string-split s (string c) #t))
-  
-  (include-file ((texinfo scheme) stexi))
+  (include-file ((texinfo private) stexi))
 
   )
