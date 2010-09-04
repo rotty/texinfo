@@ -17,7 +17,7 @@
           (srfi :39 parameters)
           (only (spells error) make-error-signaller)
           (spells include)
-          (xitomatl ssax tree-trans)
+          (wak ssax tree-trans)
           (texinfo)
           (texinfo warn))
 

@@ -1,6 +1,6 @@
 ;;; internals.sls --- library providing the texinfo internals
 
-;; Copyright (C) 2008, 2009 Andreas Rottmann <a.rottmann@gmx.at>
+;; Copyright (C) 2008-2010 Andreas Rottmann <a.rottmann@gmx.at>
 
 ;; Author: Andreas Rottmann <a.rottmann@gmx.at>
 
@@ -59,10 +59,10 @@
           (spells condition)
           (spells include)
           (spells tracing)
-          (xitomatl ssax extras)
-          (xitomatl ssax tree-trans)
-          (xitomatl ssax private-5-1 input-parse)
-          (xitomatl ssax private-5-1 look-for-str))
+          (wak ssax tree-trans)
+          (wak ssax private input-parse)
+          (wak ssax private look-for-str)
+          (ocelotl ssax-utils))
 
   (define ascii->char integer->char)
   (define open-input-string open-string-input-port)
