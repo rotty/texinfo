@@ -146,7 +146,8 @@
   `(ol ,@(if (and (pair? elts) (pair? (car elts)) (eq? (caar elts) '%))
              (cons `(^ (start ,@(tonumber (arg-req 'start (car elts)))))
                        ;; (type ,(type (arg-ref 'start (car elts)))))
-                   elts))))
+                   (cdr elts))
+             elts)))
 
 (define (itemize tag . elts)
   `(ul ,@(if (and (pair? elts) (pair? (car elts)) (eq? (caar elts) '%))
