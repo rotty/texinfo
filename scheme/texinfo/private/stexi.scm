@@ -167,6 +167,7 @@
     (emph               INLINE-TEXT)
     (strong             INLINE-TEXT)
     (sample             INLINE-TEXT)
+    (footnote           INLINE-TEXT)
     (sc                 INLINE-TEXT)
     (titlefont          INLINE-TEXT)
     (asis               INLINE-TEXT)
