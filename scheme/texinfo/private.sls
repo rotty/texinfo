@@ -1,6 +1,6 @@
 ;;; internals.sls --- library providing the texinfo internals
 
-;; Copyright (C) 2008-2010 Andreas Rottmann <a.rottmann@gmx.at>
+;; Copyright (C) 2008-2011 Andreas Rottmann <a.rottmann@gmx.at>
 
 ;; Author: Andreas Rottmann <a.rottmann@gmx.at>
 
@@ -25,7 +25,7 @@
 ;;; Code:
 #!r6rs
 
-(library (texinfo private)
+(library (wak texinfo private)
   (export
    ;; Public, reexported by (texinfo)
    texi-command-specs
@@ -68,6 +68,6 @@
   (define open-input-string open-string-input-port)
   (define error (make-error-signaller "texinfo library"))
 
-  (include-file ((texinfo private) stexi))
+  (include-file ((wak texinfo private) stexi))
 
   )

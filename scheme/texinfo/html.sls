@@ -1,7 +1,7 @@
 #!r6rs
 
-(library (texinfo html)
-  (export stexi->shtml stexi-ref-resolvers)
+(library (wak texinfo html)
+  (export stexi->shtml stexi-ref-resolvers stexi-anchor-renamers)
   (import (except (rnrs base)
                   error string-copy string->list string-for-each
                   map for-each)
@@ -18,9 +18,9 @@
           (only (spells error) make-error-signaller)
           (spells include)
           (wak ssax tree-trans)
-          (texinfo)
-          (texinfo warn))
+          (wak texinfo)
+          (wak texinfo warn))
 
   (define error (make-error-signaller "texinfo html"))
   
-  (include-file ((texinfo private) html)))
+  (include-file ((wak texinfo private) html)))

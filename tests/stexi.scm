@@ -1,5 +1,5 @@
 ;; guile-lib
-;; Copyright (C) 2008 Andreas Rottmann <a.rottmann at gmx dot at>
+;; Copyright (C) 2008, 2011 Andreas Rottmann <a.rottmann at gmx dot at>
 ;; Copyright (C) 2004 Andy Wingo <wingo at pobox dot com>
 ;; Copyright (C) 2001,2002 Oleg Kiselyov <oleg at pobox dot com>
 
@@ -30,8 +30,8 @@
 (import (rnrs)
         (spells condition)
         (only (srfi :13 strings) string-null?)
-        (texinfo private)
-        (spells testing))
+        (wak texinfo private)
+        (wak trc-testing))
 
 (define nl (string #\newline))
 
@@ -46,6 +46,14 @@
              fragment seed))
     (reverse
      (read-verbatim-body (open-string-input-port str) consumer '())))
+
+(define-syntax test-exception
+  (syntax-rules ()
+    ((test-exception predicate expression)
+     (let ((cookie (list 'cookie)))
+       (test-eq cookie
+                (guard (c ((predicate c) cookie))
+                  expression))))))
 
 (define-test-case stexi-tests read-verbatim-body ()
 

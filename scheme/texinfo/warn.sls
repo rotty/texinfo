@@ -1,6 +1,6 @@
 ;;; warn.sls --- warning library for texinfo
 
-;; Copyright (C) 2008, 2009 Andreas Rottmann <a.rottmann@gmx.at>
+;; Copyright (C) 2008, 2009, 2011 Andreas Rottmann <a.rottmann@gmx.at>
 
 ;; Author: Andreas Rottmann <a.rottmann@gmx.at>
 
@@ -24,7 +24,7 @@
 
 #!r6rs
 
-(library (texinfo warn)
+(library (wak texinfo warn)
   (export texinfo-warn-handler texinfo-warn)
   (import (rnrs base)
           (rnrs io simple)
@@ -32,6 +32,6 @@
           (srfi :39 parameters)
           (spells include))
   
-  (include-file ((texinfo private) warn))
+  (include-file ((wak texinfo private) warn))
 
   )

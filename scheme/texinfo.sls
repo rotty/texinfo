@@ -1,6 +1,6 @@
 ;;; stexi.sls --- Scheme Texinfo library
 
-;; Copyright (C) 2008 Andreas Rottmann <a.rottmann@gmx.at>
+;; Copyright (C) 2008, 2011 Andreas Rottmann <a.rottmann@gmx.at>
 
 ;; Author: Andreas Rottmann <a.rottmann@gmx.at>
 
@@ -22,12 +22,12 @@
 ;;; Code:
 #!r6rs
 
-(library (texinfo)
+(library (wak texinfo)
   (export texi-command-specs
           texi-command-depth
           texi-fragment->stexi
           texi->stexi
           stexi->sxml)
-  (import (texinfo private))
+  (import (wak texinfo private))
 
   )
