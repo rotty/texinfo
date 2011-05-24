@@ -223,7 +223,8 @@
     (sc           span (^ (class "small-caps")))))
 
 (define ignore-list
-  '(page setfilename setchapternewpage iftex ifinfo ifplaintext ifxml sp vskip
+  '(page setfilename setchapternewpage
+    iftex ifnottex ifinfo ifplaintext ifxml sp vskip
     menu ignore syncodeindex comment c dircategory direntry top shortcontents
     cindex printindex))
 (define (ignored? tag)
