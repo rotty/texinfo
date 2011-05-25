@@ -371,25 +371,22 @@
       (string-every char-whitespace? str)))
 
 ;; Like read-text-line, but allows EOF.
-(define cr (ascii->char 13))
-(define tab (ascii->char 9))
-(define nl (string #\newline))
-(define read-eof-breaks `(*EOF* ,cr #\newline))
+(define read-eof-breaks `(*EOF* #\return #\newline))
 (define (read-eof-line port)
   (if (eof-object? (peek-char port))
       (peek-char port)
       (let* ((line (next-token '() read-eof-breaks
                                "reading a line" port))
              (c (read-char port)))	; must be either \n or \r or EOF
-        (if (and (eq? c cr) (eq? (peek-char port) #\newline))
+        (if (and (eq? c #\return) (eq? (peek-char port) #\newline))
             (read-char port))		; skip \n that follows \r
         line)))
 
 (define (skip-whitespace port)
-  (skip-while `(#\space ,tab ,cr #\newline) port))
+  (skip-while '(#\space #\tab #\return #\newline) port))
 
 (define (skip-horizontal-whitespace port)
-  (skip-while `(#\space ,tab) port))
+  (skip-while '(#\space #\tab) port))
 
 ;; command ::= Letter+
 
@@ -497,7 +494,7 @@
       (read-char port)
       (if (string=? fragment "@end verbatim")
           seed
-          (loop (str-handler fragment nl seed))))))
+          (loop (str-handler fragment "\n" seed))))))
 
 ;; procedure+:	read-arguments PORT
 ;;
@@ -647,9 +644,9 @@
 ;; reading the title.
 (define (take-until-settitle port)
   (or (find-string-from-port? "\n@settitle " port)
-          (parser-error port "No \\n@settitle  found"))
-      (skip-horizontal-whitespace port)
-      (and (eq? (peek-char port) #\newline)
+      (parser-error port "No \\n@settitle  found"))
+  (skip-horizontal-whitespace port)
+  (and (eq? (peek-char port) #\newline)
        (parser-error port "You have a @settitle, but no title")))
 
 ;; procedure+:	read-char-data PORT EXPECT-EOF? STR-HANDLER SEED
@@ -726,7 +723,7 @@
                           (make-token 'PARA 'para)))
                  (else
                   (loop (handle str-handler fragment
-                                (if preserve-ws? nl " ") seed)))))))))))))
+                                (if preserve-ws? "\n" " ") seed)))))))))))))
 
 ; procedure+:	assert-token TOKEN KIND NAME
 ; Make sure that TOKEN is of anticipated KIND and has anticipated NAME

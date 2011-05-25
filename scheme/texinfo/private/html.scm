@@ -34,8 +34,7 @@
 
 ;; The caller is responsible for carring the returned list.
 (define (arg-ref key %-args)
-  (cond ((assq key (cdr %-args)) => (lambda (x) (stexi->shtml (cdr x))))
-        (else #f)))
+  (and=> (assq key (cdr %-args)) (lambda (x) (stexi->shtml (cdr x)))))
 (define (arg-req key %-args)
   (or (arg-ref key %-args)
       (error "Missing argument:" key %-args)))
@@ -228,12 +227,9 @@
     (sc           span (^ (class "small-caps")))))
 
 (define ignore-list
-  '(page setfilename setchapternewpage
-    iftex ifnottex ifinfo ifplaintext ifxml sp vskip
+  '(page setfilename setchapternewpage iftex ifinfo ifplaintext ifxml sp vskip
     menu ignore syncodeindex comment c dircategory direntry top shortcontents
     cindex printindex))
-(define (ignored? tag)
-  (memq tag ignore-list))
 
 (define rules
   `((% *PREORDER* . ,(lambda args args)) ;; Keep these around...
@@ -268,6 +264,7 @@
     (deftypevrx . ,defx) (deftypevarx . ,defx) (deffnx . ,defx) 
     (deftypefnx . ,defx) (defmacx . ,defx) (defspecx . ,defx) (defunx . ,defx)
     (deftypefunx . ,defx)
+    (ifnottex . ,(lambda (tag . body) body))
     (*TEXT*    . ,(lambda (tag x) x))
     (*DEFAULT* . ,(lambda (tag . body)
                     (let ((subst (assq tag tag-replacements)))
