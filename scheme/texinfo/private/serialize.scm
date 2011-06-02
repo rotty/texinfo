@@ -143,7 +143,7 @@
                                     (reverse (if args (cddr exp) (cdr exp))))))
               (if (or (null? body)
                       (eqv? (string-ref (car body)
-                                        (1- (string-length (car body))))
+                                        (- (string-length (car body)) 1))
                             #\newline))
                   body
                   (cons "\n" body)))
