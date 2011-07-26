@@ -290,7 +290,6 @@
     (lisp               ENVIRON . ())
     (smalllisp          ENVIRON . ())
     (cartouche          ENVIRON . ())
-    (quotation          ENVIRON . ())
 
     (deftp              ENVIRON . (category name . attributes))
     (defcv              ENVIRON . (category class name))
@@ -312,6 +311,7 @@
     (defun              ENVIRON . (name . arguments))
     (deftypefun         ENVIRON . (data-type name . arguments))
 
+    (quotation          TABLE-ENVIRON . (type))
     (table              TABLE-ENVIRON . (formatter))
     (itemize            TABLE-ENVIRON . (formatter))
     (enumerate          TABLE-ENVIRON . (start))
@@ -599,6 +599,10 @@
           ,(or (and (eq? length 1) line)
                (and (string-null? line) '(bullet))
                (list (get-formatter))))))
+      ((quotation)
+       (if (zero? length)
+           '()
+           `((type ,line))))
       (else ;; tables of various varieties
        `((formatter (,(get-formatter))))))))
 

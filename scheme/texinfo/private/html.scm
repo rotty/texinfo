@@ -173,6 +173,10 @@
             (cdr body))
         (append out `((dd ,@(map stexi->shtml body)))))))
 
+(define (quotation tag args . body)
+  (let ((type (arg-ref 'type args)))
+    `(blockquote ,@(if type `((^ (class ,type))) '()) ,@body)))
+
 (define tag-replacements
   '((titlepage    div (^ (class "titlepage")))
     (title        h2  (^ (class "title")))
@@ -201,7 +205,6 @@
     (heading      h3)
     (subheading   h4)
     (subsubheading       h5)
-    (quotation    blockquote)
     (itemize      ul)
     (item         li) ;; itemx ?
     (para         p)
@@ -255,6 +258,7 @@
     (itemize . ,itemize)
     (enumerate . ,enumerate)
     (entry *PREORDER* . ,entry)
+    (quotation . ,quotation)
 
     (deftp . ,def) (defcv . ,def) (defivar . ,def) (deftypeivar . ,def)
     (defop . ,def) (deftypeop . ,def) (defmethod . ,def)
