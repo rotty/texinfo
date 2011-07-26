@@ -51,6 +51,7 @@
           (srfi :1 lists)
           (srfi :13 strings)
           (srfi :14 char-sets)
+          (srfi :39 parameters)
           (spells string-utils)
           (only (spells error) make-error-signaller)
           (spells filesys)
@@ -64,7 +65,6 @@
           (wak ssax private look-for-str)
           (ocelotl ssax-utils))
 
-  (define ascii->char integer->char)
   (define open-input-string open-string-input-port)
   (define error (make-error-signaller "texinfo library"))
 

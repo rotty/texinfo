@@ -37,8 +37,11 @@
           string->wrapped-lines)
   (import (rnrs)
           (rnrs r5rs)
-          (srfi srfi-13)
-          (srfi srfi-14)
+          (only (srfi :13)
+                string-index
+                string-join
+                string-trim)
+          (srfi :14 char-sets)
           (spells opt-args))
 
 ;;@ Uses @var{match?} against each character in @var{str}, and

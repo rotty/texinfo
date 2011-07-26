@@ -25,7 +25,7 @@
 (library (wak texinfo serialize)
   (export stexi->texi)
   
-  (import (rnrs base)
+  (import (except (rnrs base) error)
           (rnrs lists)
           (spells alist)
           (spells format)
