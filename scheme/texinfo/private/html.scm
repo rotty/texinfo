@@ -244,6 +244,7 @@
                        (*DEFAULT*    . ,(lambda (tag . body)
                                           (cons tag body)))))))
     (copyright . ,(lambda args '(*ENTITY* "copy")))
+    (dots      . ,(lambda args '(*ENTITY* "hellip")))
     (result    . ,(lambda args '(*ENTITY* "rArr")))
     (xref . ,ref) (ref . ,ref) (pxref . ,ref)
     (uref . ,uref)
