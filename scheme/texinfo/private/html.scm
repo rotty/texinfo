@@ -177,6 +177,27 @@
   (let ((type (arg-ref 'type args)))
     `(blockquote ,@(if type `((^ (class ,type))) '()) ,@body)))
 
+(define (text tag text)
+  (let loop ((i 0) (result '()) (left? #t))
+    (define (flush-text pos)
+      (if (= i pos)
+          result
+          (cons (substring text i pos) result)))
+    (let ((q (if left? "``" "''"))
+          (entity (if left? "ldquo" "rdquo")))
+      (cond ((string-contains text q i)
+             => (lambda (pos)
+                  (loop (+ pos 2)
+                        (cons `(*ENTITY* ,entity)
+                              (flush-text pos))
+                        (not left?))))
+            (else
+             (let ((result (flush-text (string-length text))))
+               (cond ((null? result) "")
+                     ((null? (cdr result)) (car result))
+                     (else
+                      `(span ,@(reverse result))))))))))
+
 (define tag-replacements
   '((titlepage    div (^ (class "titlepage")))
     (title        h2  (^ (class "title")))
@@ -272,7 +293,7 @@
     (deftypefnx . ,defx) (defmacx . ,defx) (defspecx . ,defx) (defunx . ,defx)
     (deftypefunx . ,defx)
     (ifnottex . ,(lambda (tag . body) body))
-    (*TEXT*    . ,(lambda (tag x) x))
+    (*TEXT*    . ,text)
     (*DEFAULT* . ,(lambda (tag . body)
                     (let ((subst (assq tag tag-replacements)))
                       (cond
