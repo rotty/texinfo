@@ -140,10 +140,12 @@
 
 (define (enumerate tag . elts)
   (define (tonumber start)
-    (let ((c (ascii-lowercase (char->ascii (string-ref start 0)))))
-      (+ 1 (- c (char->ascii (if (ascii-upper? c) #\A #\a))))))
+    (cond ((string->number start) => values)
+          (else
+           (+ 1 (- (char->integer (char-downcase (string-ref start 0)))
+                   (char->integer #\a))))))
   `(ol ,@(if (and (pair? elts) (pair? (car elts)) (eq? (caar elts) '%))
-             (cons `(^ (start ,@(tonumber (arg-req 'start (car elts)))))
+             (cons `(^ (start ,(tonumber (arg-req 'start (car elts)))))
                        ;; (type ,(type (arg-ref 'start (car elts)))))
                    (cdr elts))
              elts)))
