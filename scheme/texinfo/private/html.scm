@@ -169,7 +169,7 @@
   (let lp ((out `((dt ,@(arg-req 'heading args))))
            (body body))
     (if (and (pair? body) (pair? (car body)) (eq? (caar body) 'itemx))
-        (lp (append out `(dt ,@(map stexi->shtml (cdar body))))
+        (lp (append out `((dt ,@(map stexi->shtml (cdar body)))))
             (cdr body))
         (append out `((dd ,@(map stexi->shtml body)))))))
 
