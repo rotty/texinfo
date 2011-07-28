@@ -1,0 +1,10 @@
+This is an R6RS port of the Texinfo parser and serializer included in
+GNU Guile.  It is in the process of being transformed to be part of
+the Wak code collection.  Blocking issues include:
+
+- Eliminating the dependency on spells
+
+- Syncing up with the original (upstream) Guile version; this includes
+  both ensuring we have all relevant changes having been made to
+  upstream, and likewise upstreaming all relevant changes made on this
+  codebase.
